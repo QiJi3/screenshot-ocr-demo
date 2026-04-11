@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+backend/screenshots/
+backend/ocr_records.db
+
+# Models (large binary files — download separately)
+backend/models/*.onnx
+
+# Node
+node_modules/
+frontend/node_modules/
+electron/node_modules/
+
+# Build output
+frontend/dist/
+electron/dist/
+electron/out/
+backend/dist_backend/
+backend/build_backend/
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.tmp
+*.bak

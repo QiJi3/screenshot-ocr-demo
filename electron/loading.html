@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>截图 OCR Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #001529;
+      color: #fff;
+      font-family: -apple-system, "Microsoft YaHei", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      user-select: none;
+    }
+    .title {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 48px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #1890ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status {
+      font-size: 13px;
+      color: rgba(255,255,255,0.55);
+    }
+  </style>
+</head>
+<body>
+  <div class="title">截图 OCR Demo</div>
+  <div class="subtitle">每 10 秒自动截图 · OCR 识别 · 本地存储</div>
+  <div class="spinner"></div>
+  <div class="status" id="status">正在启动 OCR 服务...</div>
+  <script>
+    const msgs = [
+      '正在启动 OCR 服务...',
+      '加载识别引擎...',
+      '初始化数据库...',
+      '即将完成...',
+    ];
+    let i = 0;
+    setInterval(() => {
+      i = (i + 1) % msgs.length;
+      document.getElementById('status').textContent = msgs[i];
+    }, 2500);
+  </script>
+</body>
+</html>

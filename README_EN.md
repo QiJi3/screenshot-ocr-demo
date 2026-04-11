@@ -1,68 +1,81 @@
-﻿[简体中文](README.md) | English
+<div align="center">
 
 # Screenshot OCR Demo
 
-An offline desktop screenshot OCR tool powered by Electron, FastAPI, and PaddleOCR.
-Built as a technical demo to showcase local AI model integration and cross-language desktop architecture.
+**An offline desktop screenshot OCR tool powered by Electron, FastAPI, and PaddleOCR**
 
-## ⬇️ Download
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
+[![Electron](https://img.shields.io/badge/Electron-Latest-47848F?logo=electron&logoColor=white)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688?logo=fastapi&logoColor=white)]()
 
-Get the latest release from **[Releases](https://github.com/QiJi3/screenshot-ocr-demo/releases)**:
-- **Portable (.zip)**: Extract and run.
-- **Installer (.exe)**: Standard Windows setup.
+[简体中文](README.md) | English
 
-## ✨ Features
+</div>
 
-- **Instant UI**: Uses `loading.html` and Electron preloaders for millisecond window rendering, while the heavy OCR engine loads asynchronously in the background (4-6s).
-- **Standalone Backend**: Compiled into `backend.exe` using PyInstaller, eliminating the need for a local Python environment.
-- **Local Storage**: Images and SQLite DB are safely stored in the system's AppData folder.
-- **Real-time SSE**: Utilizes Server-Sent Events to stream OCR progress and results.
+---
 
-## 🚀 Quick Start
+This project serves as a technical demonstration showcasing the integration of **local AI models** and the architecture of **cross-language desktop applications**.
 
-### For Users
-1. Download the latest Release.
-2. Run the application and start taking screenshots for offline recognition.
+## 📥 Downloads
 
-### For Developers
+Get the latest build artifacts from the **[Releases](https://github.com/QiJi3/screenshot-ocr-demo/releases)** page:
 
-**Prerequisites**
-- Node.js (v18+)
-- Python 3.10+
+- **Portable (.zip)**: Extract and run immediately without installation.
+- **Installer (.exe)**: Standard Windows setup wizard.
+
+## 💡 Key Features
+
+- **Asynchronous Loading & Instant UI**: Utilizes `loading.html` and Electron preloading to render the window in milliseconds, while the OCR engine loads asynchronously in the background (4-6s).
+- **Standalone Execution**: The backend is compiled into an independent `backend.exe` using `PyInstaller`, requiring no Python environment on the host machine.
+- **Data Isolation**: Images and the SQLite database are safely stored in the system's `AppData` directory to avoid permission issues and workspace pollution.
+- **Streaming Architecture**: Implements Server-Sent Events (SSE) for real-time streaming of OCR progress and recognition results.
+
+## 🛠️ Local Development
+
+### Prerequisites
+
+Ensure the following environments are installed before starting:
+- Node.js (v18 or higher recommended)
+- Python (3.10 or higher)
 - pnpm
 
-**1. Clone**
+### Quick Start
+
+**1. Clone the repository**
 ```bash
 git clone https://github.com/QiJi3/screenshot-ocr-demo.git
 cd screenshot-ocr-demo
 ```
 
-**2. Frontend Setup**
+**2. Install frontend dependencies**
 ```bash
 pnpm install
 ```
 
-**3. Backend Setup**
+**3. Configure backend environment**
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+# Activate virtual environment (Windows)
+.venv\Scripts\activate
+# Install Python dependencies
 pip install -r requirements.txt
 cd ..
 ```
 
-**4. Start Dev Server**
+**4. Start the development server**
 ```bash
 pnpm run dev
 ```
 
-**5. Build**
+**5. Production build**
 ```bash
 pnpm run build
 ```
-Build artifacts (standalone exe and zip) will be in the `dist/` directory.
+The executable and assets will be output to the `dist/` directory.
 
-## 📂 Project Structure
+## 🏗️ Project Structure
 
 ```text
 screenshot-ocr-demo/
@@ -71,38 +84,40 @@ screenshot-ocr-demo/
 │   ├── main.py               # FastAPI Service
 │   ├── ocr_engine.py         # PaddleOCR Wrapper
 │   ├── backend.spec          # PyInstaller Config
-│   └── dist_backend/         # (Generated) Standalone executable
-├── src/                      # Electron Source
+│   └── dist_backend/         # Standalone executable output
+├── src/                      # Electron Frontend
 │   ├── main/                 # Main Process
-│   ├── renderer/             # Renderer Process (UI)
-│   └── loading.html          # Splash Screen
+│   ├── renderer/             # Renderer Process (UI layer)
+│   └── loading.html          # Instant Startup Splash Screen
 └── package.json
 ```
 
-## 🔌 API Reference
+## 📡 API Reference
 
-Default local port `8000`:
+The local backend service listens on port `8000` by default.
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/api/ocr` | `POST` | Submit image for OCR |
-| `/api/status` | `GET` | Check engine status |
-| `/api/history` | `GET` | Get OCR history |
+| `/api/ocr` | `POST` | Submit an image for text recognition |
+| `/api/status` | `GET` | Check the engine loading status |
+| `/api/history` | `GET` | Query OCR history records |
 
-### SSE Format
+### SSE Progress Data Format
 
 ```http
 event: progress
 data: {"status": "processing", "percent": 50}
 
 event: result
-data: {"status": "completed", "text": "Result text", "time_cost": 1.2}
+data: {"status": "completed", "text": "Recognized text content", "time_cost": 1.2}
 
 event: error
-data: {"status": "failed", "message": "Exception occurred"}
+data: {"status": "failed", "message": "Engine initialization error"}
 ```
 
 ## ⚙️ Environment Variables
+
+The system supports custom configuration via environment variables:
 
 | Variable | Description | Default |
 | --- | --- | --- |

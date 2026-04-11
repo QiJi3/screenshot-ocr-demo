@@ -1,125 +1,111 @@
-[English](README_EN.md) | 简体中文
+﻿[English](README_EN.md) | 简体中文
 
-# Screenshot OCR Demo (截图 OCR 演示工具)
+# Screenshot OCR Demo
 
-![preview](截图URL)
+基于 Electron + FastAPI + PaddleOCR 的离线桌面截图 OCR 工具。
+本项目为技术验证 Demo，展示本地端侧大模型集成与桌面应用架构。
 
-一个基于 Electron + Python FastAPI + PaddleOCR 构建的本地桌面截图 OCR 工具。本项目主要作为**求职展示与技术 Demo**，展示了跨语言桌面应用架构设计、本地大模型服务集成以及出色的客户端体验优化。
+## ⬇️ 下载
 
-## ⬇️ 下载体验
+前往 **[Releases](https://github.com/QiJi3/screenshot-ocr-demo/releases)** 获取最新版本：
+- **便携版 (.zip)**：免安装，解压即用。
+- **安装版 (.exe)**：标准 Windows 安装向导。
 
-前往 **[GitHub Releases](https://github.com/QiJi3/screenshot-ocr-demo/releases)** 下载最新版本：
-- 📦 **免安装便携版 (.zip)**：解压即用，双击秒开。
-- 💿 **安装向导版 (.exe)**：传统的 Windows 安装程序。
+## ✨ 特性
 
----
+- **秒级响应**：引入 `loading.html` 配合 Electron 预加载，主界面瞬间开启，OCR 引擎在后台异步加载（耗时约 4-6s）。
+- **独立运行**：后端使用 PyInstaller 打包为 `backend.exe`，完全脱离本地 Python 环境。
+- **本地存储**：截图记录与 SQLite 数据库存储于系统 AppData 目录，无权限冲突风险。
+- **实时通信**：借助 Server-Sent Events (SSE) 流式返回 OCR 解析进度与结果。
 
-## ✨ 核心特性
+## 🚀 快速上手
 
-- **极致启动体验**：引入 loading.html 启动页，客户端窗口**秒级响应**，后台无感启动重量级 OCR 引擎（约 4-6 秒）。
-- **开箱即用**：后端通过 PyInstaller 编译为独立 ackend.exe，不依赖本地 Python 环境或 .venv。
-- **数据安全隔离**：截图文件与 SQLite 数据库默认存储于系统的 userData (AppData) 目录，避免权限问题与目录污染。
-- **SSE 流式通信**：前端与后端通过 Server-Sent Events (SSE) 实时推送 OCR 进度与识别结果。
-- **现代化架构**：Electron (UI 壳) + FastAPI (核心计算) 的解耦设计。
+### 普通用户
+1. 下载 Release 压缩包或安装程序并运行。
+2. 使用快捷键或点击按钮截图，等待毫秒级离线识别结果。
 
-## 🚀 快速开始
+### 开发者部署
 
-### 👤 普通用户体验
-1. 前往 [Releases](https://github.com/QiJi3/screenshot-ocr-demo/releases) 下载 .zip 或安装包。
-2. 运行 Screenshot OCR Demo.exe。
-3. 截图并体验秒级离线 OCR 解析。
-
-### 💻 开发者指南（本地开发）
-
-#### 环境准备
-- Node.js (推荐 v18+)
+**环境要求**
+- Node.js (v18+)
 - Python 3.10+
 - pnpm
 
-#### 1. 克隆代码
-`ash
+**1. 拉取代码**
+```bash
 git clone https://github.com/QiJi3/screenshot-ocr-demo.git
 cd screenshot-ocr-demo
-`
+```
 
-#### 2. 安装前端依赖
-`ash
+**2. 前端依赖**
+```bash
 pnpm install
-`
+```
 
-#### 3. 配置后端环境
-`ash
+**3. 后端环境**
+```bash
 cd backend
 python -m venv .venv
-# 激活虚拟环境 (Windows)
-.venv\Scripts\activate
-# 安装依赖
+.venv\Scripts\activate  # Windows
 pip install -r requirements.txt
 cd ..
-`
+```
 
-#### 4. 启动开发环境
-`ash
-# 启动前端及后端服务
+**4. 启动开发服务**
+```bash
 pnpm run dev
-`
+```
 
-#### 5. 打包构建
-`ash
-# 构建后端可执行文件 (PyInstaller) 及前端资源
+**5. 构建打包**
+```bash
 pnpm run build
-`
-构建产物将生成两种格式（便携 zip 及 nsis 安装包），位于 dist/ 目录下。
+```
+产物将输出至 `dist/` 目录（包含独立可执行文件及资源）。
 
-## 📂 项目结构
+## 📂 目录结构
 
-`	ext
+```text
 screenshot-ocr-demo/
-├── .github/                  # GitHub Actions CI/CD 工作流
-├── backend/                  # Python 后端目录
-│   ├── main.py               # FastAPI 核心服务
-│   ├── ocr_engine.py         # PaddleOCR 引擎封装
-│   ├── backend.spec          # PyInstaller 构建配置
-│   ├── requirements.txt      # Python 依赖
-│   └── dist_backend/         # (构建生成) 后端可执行文件目录
-├── src/                      # Electron 源码目录
-│   ├── main/                 # 主进程 (窗口管理、后端子进程调度)
-│   ├── renderer/             # 渲染进程 (Vue/React UI层)
-│   └── loading.html          # 秒开动画加载页
-├── package.json
-└── README.md
-`
+├── .github/                  # CI/CD 自动化构建
+├── backend/                  # Python 后端
+│   ├── main.py               # FastAPI 服务
+│   ├── ocr_engine.py         # PaddleOCR 封装
+│   ├── backend.spec          # PyInstaller 配置
+│   └── dist_backend/         # (构建后) 独立可执行文件
+├── src/                      # Electron 源码
+│   ├── main/                 # 主进程 (包含子进程调度)
+│   ├── renderer/             # 渲染进程 (Vue/React UI)
+│   └── loading.html          # 极速启动屏
+└── package.json
+```
 
-## 🔌 API Reference
+## 🔌 API 接口
 
-后端基于 FastAPI 提供以下本地 RESTful API（默认端口 8000）：
+默认本地端口 `8000`：
 
-| 接口 | 方法 | 描述 |
+| Endpoint | Method | 描述 |
 | --- | --- | --- |
-| /api/ocr | POST | 提交图片进行 OCR 识别任务 |
-| /api/status | GET | 检查后端服务就绪状态 |
-| /api/history | GET | 获取历史 OCR 识别记录 |
+| `/api/ocr` | `POST` | 提交截图进行识别 |
+| `/api/status` | `GET` | 检查后端引擎状态 |
+| `/api/history` | `GET` | 查询历史识别记录 |
 
-### SSE (Server-Sent Events) 数据流格式
-图片上传后，建立 SSE 连接以接收实时解析进度：
+### SSE 进度格式
 
-`http
+```http
 event: progress
 data: {"status": "processing", "percent": 50}
 
 event: result
-data: {"status": "completed", "text": "识别到的文本内容", "time_cost": 1.2}
+data: {"status": "completed", "text": "识别结果", "time_cost": 1.2}
 
 event: error
-data: {"status": "failed", "message": "引擎初始化失败"}
-`
+data: {"status": "failed", "message": "引擎异常"}
+```
 
 ## ⚙️ 环境变量
 
-系统支持通过环境变量进行自定义配置：
-
-| 变量名 | 说明 | 默认值 |
+| 变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| PORT | 后端服务监听端口 | 8000 |
-| WORKER_COUNT | OCR 引擎工作线程数 | 1 |
-| DB_PATH | SQLite 数据库文件存储路径 | %APPDATA%/screenshot-ocr-demo/db.sqlite3 |
+| `PORT` | 后端端口 | `8000` |
+| `WORKER_COUNT` | 工作线程数 | `1` |
+| `DB_PATH` | 数据库路径 | `%APPDATA%/screenshot-ocr-demo/db.sqlite3` |

@@ -1,8 +1,9 @@
 import os
 import asyncio
 import json
+from pathlib import Path
 import numpy as np
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -13,6 +14,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
+from ocr_config import OCRConfig
 
 app = FastAPI()
 
@@ -44,18 +46,42 @@ engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread"
 Base.metadata.create_all(bind=engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
-_det = os.path.join(MODELS_DIR, "ch_PP-OCRv4_det_infer.onnx")
-_rec = os.path.join(MODELS_DIR, "ch_PP-OCRv4_rec_infer.onnx")
-if os.path.exists(_det) and os.path.exists(_rec):
-    ocr_engine = RapidOCR(det_model_path=_det, rec_model_path=_rec, det_limit_side_len=1280)
-    print("[OCR] Using PP-OCRv4 models")
-else:
-    ocr_engine = RapidOCR(det_limit_side_len=1280)
-    print("[OCR] Using default models (put v4 .onnx in backend/models/ for better accuracy)")
+CONFIG_PATH = os.environ.get(
+    "OCR_CONFIG_PATH",
+    os.path.join(os.environ.get("APPDATA", "."), "screenshot-ocr-demo", "config.json"),
+)
+ocr_config = OCRConfig(CONFIG_PATH)
 
+_ocr_engine = None
+_ocr_engine_lock = asyncio.Lock()
 _ocr_lock = asyncio.Lock()
 _subscribers: list[asyncio.Queue] = []
+
+
+async def get_ocr_engine():
+    """获取 OCR 引擎实例，支持动态切换模型"""
+    global _ocr_engine
+
+    async with _ocr_engine_lock:
+        det_path, rec_path = ocr_config.get_model_paths()
+
+        # 如果配置的模型文件不存在，降级到默认模型
+        if det_path is None or rec_path is None:
+            print("[OCR Engine] Model files not found, using RapidOCR default models")
+            _ocr_engine = RapidOCR(det_limit_side_len=1280)
+        else:
+            try:
+                _ocr_engine = RapidOCR(
+                    det_model_path=det_path,
+                    rec_model_path=rec_path,
+                    det_limit_side_len=1280,
+                )
+                print(f"[OCR Engine] Loaded {ocr_config.model_version} model: {det_path}")
+            except Exception as e:
+                print(f"[OCR Engine] Failed to load model: {e}, using default")
+                _ocr_engine = RapidOCR(det_limit_side_len=1280)
+
+        return _ocr_engine
 
 class OCRRequest(BaseModel):
     file_name: str
@@ -70,7 +96,7 @@ def _preprocess(filepath: str) -> np.ndarray:
     img = img.filter(ImageFilter.SHARPEN)
     return np.array(img)
 
-def _run_ocr(filepath: str) -> tuple:
+def _run_ocr(filepath: str, ocr_engine: RapidOCR) -> tuple:
     src = _preprocess(filepath) if app_settings.enable_preprocess else filepath
     return ocr_engine(src)
 
@@ -82,6 +108,7 @@ class AppSettings(BaseModel):
     capture_scale: float = 1.0      # 0.5 | 1.0 | 1.5 | 2.0
 
 app_settings = AppSettings()
+settings_router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 @app.get("/health")
 def health():
@@ -97,13 +124,87 @@ def update_settings(new_settings: AppSettings):
     app_settings = new_settings
     return app_settings
 
+
+@settings_router.get("/ocr-config")
+async def get_ocr_config():
+    """获取当前 OCR 配置"""
+    try:
+        det_path, rec_path = ocr_config.get_model_paths()
+        return {
+            "status": "success",
+            "model_version": ocr_config.model_version,
+            "custom_det_path": ocr_config.custom_det_path,
+            "custom_rec_path": ocr_config.custom_rec_path,
+            "available_versions": ["v3", "v4", "custom"],
+            "model_status": "ready" if (det_path and rec_path) else "not_ready",
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@settings_router.post("/ocr-config")
+async def update_ocr_config(request_body: dict):
+    """更新 OCR 配置"""
+    try:
+        model_version = request_body.get("model_version", "v4")
+
+        if model_version not in ["v3", "v4", "custom"]:
+            return {"status": "error", "message": f"Invalid model_version: {model_version}"}
+
+        ocr_config.model_version = model_version
+
+        if model_version == "custom":
+            ocr_config.custom_det_path = request_body.get("custom_det_path", "")
+            ocr_config.custom_rec_path = request_body.get("custom_rec_path", "")
+
+        ocr_config.save()
+        await get_ocr_engine()
+
+        return {
+            "status": "success",
+            "message": "Configuration updated successfully",
+            "model_version": ocr_config.model_version,
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@settings_router.get("/available-models")
+async def list_available_models():
+    """列出所有可用的 OCR 模型"""
+    models_dir = Path(__file__).parent / "models"
+    available = []
+
+    v3_det = models_dir / "ch_PP-OCRv3_det_infer.onnx"
+    v3_rec = models_dir / "ch_PP-OCRv3_rec_infer.onnx"
+    available.append(
+        {
+            "name": "v3",
+            "description": "PP-OCRv3 (Fast, lower accuracy)",
+            "available": v3_det.exists() and v3_rec.exists(),
+        }
+    )
+
+    v4_det = models_dir / "ch_PP-OCRv4_det_infer.onnx"
+    v4_rec = models_dir / "ch_PP-OCRv4_rec_infer.onnx"
+    available.append(
+        {
+            "name": "v4",
+            "description": "PP-OCRv4 (Slower, higher accuracy)",
+            "available": v4_det.exists() and v4_rec.exists(),
+        }
+    )
+
+    return {"status": "success", "available_models": available}
+
 @app.post("/captures/process")
 async def process_ocr(request: OCRRequest):
     try:
         filepath = os.path.join(SCREENSHOTS_DIR, request.file_name)
+        engine = await get_ocr_engine()
         loop = asyncio.get_running_loop()
         async with _ocr_lock:
-            result, _ = await loop.run_in_executor(None, _run_ocr, filepath)
+            result, _ = await loop.run_in_executor(None, _run_ocr, filepath, engine)
         text = ""
         if result:
             filtered = [r for r in result if r[2] >= app_settings.confidence]
@@ -175,9 +276,10 @@ async def recognize_upload(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, tmp)
         tmp_path = tmp.name
     try:
+        engine = await get_ocr_engine()
         loop = asyncio.get_running_loop()
         async with _ocr_lock:
-            result, _ = await loop.run_in_executor(None, _run_ocr, tmp_path)
+            result, _ = await loop.run_in_executor(None, _run_ocr, tmp_path, engine)
         text = ""
         if result:
             filtered = [r for r in result if r[2] >= app_settings.confidence]
@@ -224,6 +326,8 @@ async def sse_events():
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+app.include_router(settings_router)
 
 if FRONTEND_DIR and os.path.isdir(FRONTEND_DIR):
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

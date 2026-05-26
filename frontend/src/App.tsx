@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Layout, Row, Col, Typography, Alert, Spin, Space,
   Button, Drawer, Form, Slider, InputNumber, Switch,
-  Select, Upload, Image, message, ConfigProvider, Divider
+  Select, Upload, Image, message, ConfigProvider, Divider, Tooltip, type UploadProps
 } from 'antd';
 import {
   LoadingOutlined, MonitorOutlined, GlobalOutlined,
@@ -12,6 +12,7 @@ import axios from 'axios';
 import MonitorCard from './components/MonitorCard';
 import OcrResultCard from './components/OcrResultCard';
 import HistoryTable from './components/HistoryTable';
+import { SettingsPanel } from './components/SettingsPanel';
 import type { OCRRecord } from './types';
 
 const { Header, Content } = Layout;
@@ -28,12 +29,15 @@ interface AppSettings {
   capture_mode: string;
 }
 
+type DemoUploadFile = Parameters<NonNullable<UploadProps['beforeUpload']>>[0];
+
 const App: React.FC = () => {
   const [latest, setLatest] = useState<OCRRecord | null>(null);
   const [history, setHistory] = useState<OCRRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [backendReady, setBackendReady] = useState(false);
   const [countdown, setCountdown] = useState(SCREENSHOT_INTERVAL_SECONDS);
+  const [ocrSettingsVisible, setOcrSettingsVisible] = useState(false);
 
   // 设置抽屉
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -47,7 +51,7 @@ const App: React.FC = () => {
 
   // Demo 抽屉
   const [demoOpen, setDemoOpen] = useState(false);
-  const [demoFile, setDemoFile] = useState<File | null>(null);
+  const [demoFile, setDemoFile] = useState<DemoUploadFile | null>(null);
   const [demoPreview, setDemoPreview] = useState<string>('');
   const [demoText, setDemoText] = useState<string>('');
   const [demoLoading, setDemoLoading] = useState(false);
@@ -168,13 +172,21 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDemoBeforeUpload: NonNullable<UploadProps['beforeUpload']> = (file) => {
+    setDemoFile(file);
+    setDemoText('');
+    const url = URL.createObjectURL(file);
+    setDemoPreview(url);
+    return false;
+  };
+
   return (
     <ConfigProvider theme={{ token: { fontSize: 15, fontSizeLG: 17, fontSizeXL: 20 } }}>
       <Layout style={{ minHeight: '100vh', background: '#f5f7fb' }}>
         <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#001529', padding: '0 24px' }}>
           <Space>
             <MonitorOutlined style={{ color: 'white', fontSize: 22 }} />
-            <Title level={3} style={{ color: 'white', margin: 0, fontSize: 20 }}>截图 OCR Demo</Title>
+            <Title level={3} style={{ color: 'white', margin: 0, fontSize: 20 }}>Screenshot OCR Demo</Title>
           </Space>
           <Space>
             <Text style={{ color: 'rgba(255,255,255,0.65)' }}>每 10 秒自动截图 · OCR 识别 · 本地存储</Text>
@@ -182,9 +194,19 @@ const App: React.FC = () => {
               style={{ borderColor: 'rgba(255,255,255,0.3)', color: 'white', background: 'transparent' }}>
               上传识别
             </Button>
-            <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}
+            <Tooltip title="打开 OCR 设置">
+              <Button
+                type="text"
+                icon={<SettingOutlined />}
+                size="large"
+                aria-label="打开 OCR 设置"
+                onClick={() => setOcrSettingsVisible(true)}
+                style={{ color: 'white', display: 'flex', alignItems: 'center' }}
+              />
+            </Tooltip>
+            <Button onClick={() => setSettingsOpen(true)}
               style={{ borderColor: 'rgba(255,255,255,0.3)', color: 'white', background: 'transparent' }}>
-              设置
+              参数
             </Button>
             <Button icon={<GlobalOutlined />} onClick={() => window.open('http://127.0.0.1:8000', '_blank')}
               style={{ borderColor: 'rgba(255,255,255,0.3)', color: 'white', background: 'transparent' }}>
@@ -229,11 +251,11 @@ const App: React.FC = () => {
               <Row gutter={12} align="middle">
                 <Col flex="auto">
                   <Slider min={0.1} max={0.9} step={0.05} value={settings.confidence}
-                    onChange={(v) => setSettings(s => ({ ...s, confidence: v }))} />
+                    onChange={(v: number) => setSettings(s => ({ ...s, confidence: v }))} />
                 </Col>
                 <Col>
                   <InputNumber min={0.1} max={0.9} step={0.05} precision={2} value={settings.confidence}
-                    onChange={(v) => v != null && setSettings(s => ({ ...s, confidence: v }))} style={{ width: 70 }} />
+                    onChange={(v: number | null) => v != null && setSettings(s => ({ ...s, confidence: v }))} style={{ width: 70 }} />
                 </Col>
               </Row>
             </Form.Item>
@@ -242,11 +264,11 @@ const App: React.FC = () => {
               <Row gutter={12} align="middle">
                 <Col flex="auto">
                   <Slider min={5} max={50} step={1} value={settings.line_threshold}
-                    onChange={(v) => setSettings(s => ({ ...s, line_threshold: v }))} />
+                    onChange={(v: number) => setSettings(s => ({ ...s, line_threshold: v }))} />
                 </Col>
                 <Col>
                   <InputNumber min={5} max={50} step={1} value={settings.line_threshold}
-                    onChange={(v) => v != null && setSettings(s => ({ ...s, line_threshold: v }))} style={{ width: 70 }} />
+                    onChange={(v: number | null) => v != null && setSettings(s => ({ ...s, line_threshold: v }))} style={{ width: 70 }} />
                 </Col>
               </Row>
             </Form.Item>
@@ -255,13 +277,13 @@ const App: React.FC = () => {
 
             <Form.Item label="图像预处理" help="低分辨率截图自动放大 + 增强对比度 + 锐化，提升识别率">
               <Switch checked={settings.enable_preprocess}
-                onChange={(v) => setSettings(s => ({ ...s, enable_preprocess: v }))}
+                onChange={(v: boolean) => setSettings(s => ({ ...s, enable_preprocess: v }))}
                 checkedChildren="开启" unCheckedChildren="关闭" />
             </Form.Item>
 
             <Form.Item label="截图范围" help="全屏：截整个桌面；活跃窗口：只截当前前台窗口（噪音更少）">
               <Select value={settings.capture_mode}
-                onChange={(v) => setSettings(s => ({ ...s, capture_mode: v }))}
+                onChange={(v: string) => setSettings(s => ({ ...s, capture_mode: v }))}
                 options={[
                   { value: 'screen', label: '全屏' },
                   { value: 'window', label: '活跃窗口' },
@@ -282,13 +304,10 @@ const App: React.FC = () => {
             <Dragger
               accept="image/*"
               showUploadList={false}
-              beforeUpload={(file) => {
-                setDemoFile(file);
-                setDemoText('');
-                const url = URL.createObjectURL(file);
-                setDemoPreview(url);
-                return false;
-              }}
+              capture={false}
+              hasControlInside={false}
+              pastable={false}
+              beforeUpload={handleDemoBeforeUpload}
             >
               <p className="ant-upload-drag-icon"><InboxOutlined /></p>
               <p className="ant-upload-text">点击或拖拽图片到此处</p>
@@ -313,6 +332,11 @@ const App: React.FC = () => {
             )}
           </Space>
         </Drawer>
+
+        <SettingsPanel
+          visible={ocrSettingsVisible}
+          onClose={() => setOcrSettingsVisible(false)}
+        />
       </Layout>
     </ConfigProvider>
   );

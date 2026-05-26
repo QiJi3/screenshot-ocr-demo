@@ -307,7 +307,7 @@ function buildMenu() {
           click: () => {
             dialog.showMessageBox({
               title: APP_TITLE,
-              message: `${APP_TITLE} v1.0.0`,
+              message: `${APP_TITLE} v${app.getVersion()}`,
               detail: '每 10 秒自动截图，本地 OCR 识别，结果存入 SQLite。',
               buttons: ['确定'],
             });

@@ -1,5 +1,9 @@
 # Screenshot OCR Demo
 
+<p align="center">
+  <img src="docs/images/banner.png" alt="Screenshot OCR Demo Banner" width="800" />
+</p>
+
 基于 Electron + FastAPI + RapidOCR 的离线桌面截图 OCR 工具，支持 PP-OCRv3、PP-OCRv4 与自定义 ONNX 模型。
 
 [English](README_EN.md) | 简体中文
@@ -73,7 +77,7 @@ Electron 安装包与压缩包会输出到 `electron/dist/` 目录。
 
 ## 📡 API
 
-本地后端服务默认监听 `127.0.0.1:8000`。
+本征后端服务默认监听 `127.0.0.1:8000`。
 
 - `GET /health`：健康检查
 - `POST /ocr/recognize`：执行 OCR 识别

@@ -1,4 +1,5 @@
 import os
+import httpx
 import asyncio
 import json
 from pathlib import Path
@@ -125,6 +126,36 @@ def update_settings(new_settings: AppSettings):
     return app_settings
 
 
+@settings_router.get("/llm-config")
+async def get_llm_config():
+    """获取当前 LLM 配置"""
+    try:
+        return {
+            "status": "success",
+            "llm_api_key": ocr_config.llm_api_key,
+            "llm_base_url": ocr_config.llm_base_url,
+            "llm_model": ocr_config.llm_model,
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@settings_router.post("/llm-config")
+async def update_llm_config(request_body: dict):
+    """更新 LLM 配置"""
+    try:
+        ocr_config.llm_api_key = request_body.get("llm_api_key", "")
+        ocr_config.llm_base_url = request_body.get("llm_base_url", "https://api.deepseek.com/v1")
+        ocr_config.llm_model = request_body.get("llm_model", "deepseek-chat")
+        ocr_config.save()
+        return {
+            "status": "success",
+            "message": "LLM configuration updated successfully",
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @settings_router.get("/ocr-config")
 async def get_ocr_config():
     """获取当前 OCR 配置"""
@@ -196,6 +227,86 @@ async def list_available_models():
     )
 
     return {"status": "success", "available_models": available}
+
+@app.post("/api/ai/process")
+async def process_with_ai(body: dict):
+    text = body.get("text", "")
+    task_type = body.get("task_type", "code_explain")
+    
+    api_key = os.environ.get("LLM_API_KEY") or ocr_config.llm_api_key
+    base_url = os.environ.get("LLM_BASE_URL") or ocr_config.llm_base_url
+    model = os.environ.get("LLM_MODEL") or ocr_config.llm_model
+    
+    if not api_key:
+        async def err_gen():
+            yield f"data: {json.dumps({'error': 'LLM API Key is not configured. Please set it in Settings.'})}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(err_gen(), media_type="text/event-stream")
+        
+    prompts = {
+        "code_explain": "You are an expert developer. Analyze the following OCR recognized text from a code screenshot. Explain any errors or logic, and provide the corrected code with brief explanations in Chinese:\n\n",
+        "translate": "You are a professional translator. Translate the following text into natural and fluent Chinese (or English if the input is Chinese). Only provide the translated text without extra explanation:\n\n",
+        "table_markdown": "Format the following tabular text into a clean Markdown table. Only output the markdown table code block:\n\n",
+        "summarize": "Summarize the following text into a few key points in Chinese:\n\n"
+    }
+    
+    prompt_prefix = prompts.get(task_type, "Please process the following text:\n\n")
+    full_prompt = f"{prompt_prefix}{text}"
+    
+    async def stream_generator():
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": full_prompt}],
+            "stream": True
+        }
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                clean_url = f"{base_url.rstrip('/')}/chat/completions"
+                async with client.stream(
+                    "POST",
+                    clean_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=30.0
+                ) as response:
+                    if response.status_code != 200:
+                        error_detail = await response.aread()
+                        err_text = error_detail.decode(errors='ignore')
+                        err_msg = f"LLM API error (Status {response.status_code}): {err_text}"
+                        yield f"data: {json.dumps({'error': err_msg})}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+                        
+                    async for line in response.iter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            if data_str.strip() == "[DONE]":
+                                yield "data: [DONE]\n\n"
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                content = data_json["choices"][0]["delta"].get("content", "")
+                                if content:
+                                    yield f"data: {json.dumps({'content': content})}\n\n"
+                            except Exception:
+                                pass
+            except Exception as e:
+                yield f"data: {json.dumps({'error': f'Connection failed: {str(e)}'})}\n\n"
+                yield "data: [DONE]\n\n"
+                
+    return StreamingResponse(
+        stream_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 @app.post("/captures/process")
 async def process_ocr(request: OCRRequest):

@@ -80,6 +80,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     custom_rec_path: '',
     model_status: 'not_ready',
   });
+  const [llmConfig, setLlmConfig] = useState({
+    llm_api_key: '',
+    llm_base_url: 'https://api.deepseek.com/v1',
+    llm_model: 'deepseek-chat',
+  });
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -90,8 +95,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
 
     void fetchConfig();
+    void fetchLlmConfig();
     void fetchAvailableModels();
   }, [visible]);
+
+  const fetchLlmConfig = async () => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/settings/llm-config`);
+      if (res.data.status === 'success') {
+        setLlmConfig({
+          llm_api_key: res.data.llm_api_key || '',
+          llm_base_url: res.data.llm_base_url || 'https://api.deepseek.com/v1',
+          llm_model: res.data.llm_model || 'deepseek-chat',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load LLM config:', error);
+    }
+  };
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -136,17 +157,31 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     setSaving(true);
     try {
+      // Save OCR Config
       const res = await axios.post<UpdateConfigResponse>(`${BACKEND_URL}/api/settings/ocr-config`, {
         model_version: config.model_version,
         custom_det_path: config.custom_det_path,
         custom_rec_path: config.custom_rec_path,
       });
 
-      if (res.data.status === 'success') {
+      if (res.data.status !== 'success') {
+        void message.error(`OCR配置保存失败: ${res.data.message || '未知错误'}`);
+        setSaving(false);
+        return;
+      }
+
+      // Save LLM Config
+      const llmRes = await axios.post(`${BACKEND_URL}/api/settings/llm-config`, {
+        llm_api_key: llmConfig.llm_api_key,
+        llm_base_url: llmConfig.llm_base_url,
+        llm_model: llmConfig.llm_model,
+      });
+
+      if (llmRes.data.status === 'success') {
         void message.success('配置已保存。应用重启后生效。');
         onClose();
       } else {
-        void message.error(`保存失败: ${res.data.message || '未知错误'}`);
+        void message.error(`LLM配置保存失败: ${llmRes.data.message || '未知错误'}`);
       }
     } catch (error) {
       void message.error(`保存失败: ${getErrorMessage(error)}`);
@@ -288,6 +323,47 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </>
           )}
+
+          <Divider style={{ margin: '8px 0' }}>大模型 AI 配置</Divider>
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              LLM API Key (支持 DeepSeek, OpenAI 兼容格式)
+            </Text>
+            <Input.Password
+              placeholder="填入您的 API Key (保存在本地 AppData, 绝不泄露)"
+              value={llmConfig.llm_api_key}
+              onChange={(event) => {
+                const val = event.target.value;
+                setLlmConfig(curr => ({ ...curr, llm_api_key: val }));
+              }}
+            />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              LLM Base URL
+            </Text>
+            <Input
+              placeholder="例如：https://api.deepseek.com/v1"
+              value={llmConfig.llm_base_url}
+              onChange={(event) => {
+                const val = event.target.value;
+                setLlmConfig(curr => ({ ...curr, llm_base_url: val }));
+              }}
+            />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              LLM Model
+            </Text>
+            <Input
+              placeholder="例如：deepseek-chat, gpt-4o-mini"
+              value={llmConfig.llm_model}
+              onChange={(event) => {
+                const val = event.target.value;
+                setLlmConfig(curr => ({ ...curr, llm_model: val }));
+              }}
+            />
+          </div>
 
           <Alert
             message="提示"

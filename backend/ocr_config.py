@@ -1,4 +1,4 @@
-# ocr_config.py - OCR 模型配置管理
+# ocr_config.py - OCR 模型与 LLM 配置管理
 from enum import Enum
 from pathlib import Path
 import json
@@ -12,7 +12,7 @@ class ModelVersion(str, Enum):
 
 
 class OCRConfig:
-    """OCR 模型配置管理类"""
+    """OCR 模型与 LLM 配置管理类"""
 
     def __init__(self, config_path: str = None):
         if config_path is None:
@@ -24,6 +24,11 @@ class OCRConfig:
         self.model_version = "v4"  # 默认值
         self.custom_det_path = ""
         self.custom_rec_path = ""
+        
+        # LLM 相关设置
+        self.llm_api_key = ""
+        self.llm_base_url = "https://api.deepseek.com/v1"
+        self.llm_model = "deepseek-chat"
         self.load()
 
     def load(self):
@@ -35,6 +40,9 @@ class OCRConfig:
                     self.model_version = config.get("model_version", "v4")
                     self.custom_det_path = config.get("custom_det_path", "")
                     self.custom_rec_path = config.get("custom_rec_path", "")
+                    self.llm_api_key = config.get("llm_api_key", "")
+                    self.llm_base_url = config.get("llm_base_url", "https://api.deepseek.com/v1")
+                    self.llm_model = config.get("llm_model", "deepseek-chat")
                     print(f"[OCR Config] Loaded from {self.config_path}")
             else:
                 print("[OCR Config] Config file not found, using defaults")
@@ -49,6 +57,9 @@ class OCRConfig:
                 "model_version": self.model_version,
                 "custom_det_path": self.custom_det_path,
                 "custom_rec_path": self.custom_rec_path,
+                "llm_api_key": self.llm_api_key,
+                "llm_base_url": self.llm_base_url,
+                "llm_model": self.llm_model,
             }
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_path, "w", encoding="utf-8") as f:
@@ -58,16 +69,10 @@ class OCRConfig:
             print(f"[OCR Config] Error saving config: {e}")
 
     def get_model_paths(self) -> tuple:
-        """获取当前选择的模型文件路径
-
-        Returns:
-            (det_model_path, rec_model_path) 元组
-            如果模型文件不存在，返回 (None, None)
-        """
+        """获取当前选择的模型文件路径"""
         models_dir = Path(__file__).parent / "models"
 
         if self.model_version == ModelVersion.CUSTOM:
-            # 自定义模型路径
             if self.custom_det_path and self.custom_rec_path:
                 return (self.custom_det_path, self.custom_rec_path)
             else:
@@ -75,7 +80,6 @@ class OCRConfig:
                 return (None, None)
 
         elif self.model_version == ModelVersion.V4:
-            # PP-OCRv4 模型
             det_path = models_dir / "ch_PP-OCRv4_det_infer.onnx"
             rec_path = models_dir / "ch_PP-OCRv4_rec_infer.onnx"
             if det_path.exists() and rec_path.exists():
@@ -85,7 +89,6 @@ class OCRConfig:
                 return (None, None)
 
         elif self.model_version == ModelVersion.V3:
-            # PP-OCRv3 模型
             det_path = models_dir / "ch_PP-OCRv3_det_infer.onnx"
             rec_path = models_dir / "ch_PP-OCRv3_rec_infer.onnx"
             if det_path.exists() and rec_path.exists():

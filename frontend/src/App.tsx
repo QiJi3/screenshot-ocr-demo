@@ -231,7 +231,7 @@ const App: React.FC = () => {
           ) : (
             <Row gutter={[24, 24]}>
               <Col span={10}><MonitorCard latest={latest} loading={loading} countdown={countdown} /></Col>
-              <Col span={14}><OcrResultCard latest={latest} /></Col>
+              <Col span={14}><OcrResultCard latest={latest} backendUrl={BACKEND_URL} /></Col>
               <Col span={24}><HistoryTable history={history} loading={loading} /></Col>
             </Row>
           )}
